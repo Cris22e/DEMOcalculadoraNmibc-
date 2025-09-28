@@ -126,10 +126,10 @@ function calcular(){
   const imc = +document.getElementById('imc').value || 27;
 
   // Tumor
-  const estadio = +document.getElementById('estadio').value;
-  const grado = +document.getElementById('grado').value;
+  const estadio = +document.getElementById('estadio').value; // 0=Ta, 1=T1
+  const grado = +document.getElementById('grado').value;     // 0=Bajo, 1=Alto
   const cis = +document.getElementById('cis').value;
-  const nTum = +document.getElementById('nTum').value;
+  const nTum = +document.getElementById('nTum').value;       // 0=Único, 1=2–7, 2=≥8
   const tam = +document.getElementById('tam').value;
   const recPrev = +document.getElementById('recPrev').value;
 
@@ -155,7 +155,7 @@ function calcular(){
     + 0.6*estadio     // T1
     + 0.7*grado       // alto
     + 0.6*cis         // CIS
-    + (nTum===1?0.35:(nTum===2?0.75:1.0))  // 2–7 vs >=8
+    + (nTum===1?0.35:(nTum===2?1.0:0))  // 2–7 vs >=8 (subo peso de >=8)
     + 0.45*tam        // >30mm
     + 0.35*recPrev
     - 0.45*bcgComp    // inducción completa protege
@@ -176,13 +176,25 @@ function calcular(){
     + (imc>32?0.03:0)
     + 0.02*sexo;                    // mujer pequeño incremento (solo demo)
 
-  const p24 = logistic(z);
-  const p12 = Math.max(0, p24 - 0.12);
+  let p24 = logistic(z);
+  let p12 = Math.max(0, p24 - 0.12);
 
+  // Grupo por probabilidad (demo original)
   let grupo = "Bajo", badge="low";
   if (p24 >= 0.30 && p24 < 0.55){ grupo="Intermedio"; badge="mid"; }
   else if (p24 >= 0.55){ grupo="Alto"; badge="high"; }
 
+  // ✅ REGLA EVIDENTE: T1 + ALTO GRADO + >1 TUMOR => ALTO (forzamos mínimo razonable)
+  if (estadio === 1 && grado === 1 && nTum > 0){
+    grupo = "Alto";
+    badge = "high";
+    if (p24 < 0.60){                 // si venía bajo, elevamos a un valor coherente
+      p24 = 0.60;
+      p12 = Math.max(0, p24 - 0.12); // mantiene gap demo 12pp
+    }
+  }
+
+  // Pintar UI
   document.getElementById('badge').className = "chip " + badge;
   document.getElementById('badge').textContent = grupo;
   document.getElementById('resumen').textContent = `Estimación a 12m: ${(p12*100).toFixed(0)}% · 24m: ${(p24*100).toFixed(0)}%`;
